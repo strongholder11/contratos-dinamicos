@@ -480,6 +480,72 @@ with col_form:
                 except Exception as e:
                     st.error(f"❌ Erro ao gerar contrato: {e}")
 
+        # Selecionar desconto
+    desconto_pj = st.selectbox(
+        "Desconto de Licença",
+        options=['0%', '5%', '10%', '15%', '20%'],
+        key="pj_desconto"
+    )
+    
+    # Seção de cálculo de valores (só aparece após preenchimento dos campos anteriores)
+    if tipo_licenca_pj and formato_pagamento_pj and qtd_equipos_pj:
+        st.markdown("---")
+        st.subheader("Resumo Financeiro")
+        
+        # Encontra a chave de formato de pagamento
+        formato_key = {
+            'Recorrente': '1',
+            'Plano Integral no Cartão': '2',
+            'PIX': '3',
+            'Mensal': '4'
+        }.get(formato_pagamento_pj, '1')
+        
+        # Encontra a chave de desconto
+        desconto_key = {
+            '0%': '0',
+            '5%': '1',
+            '10%': '2',
+            '15%': '3',
+            '20%': '4'
+        }.get(desconto_pj, '0')
+        
+        # Calcula valor mensal da licença
+        valor_mensal = gerador.calcular_valor_licenca(tipo_licenca_key, formato_key, qtd_equipos_pj)
+        
+        # Calcula taxa de implantação
+        taxa_impl = gerador.TAXA_IMPLANTACAO.get(formato_key, 490.00)
+        
+        # Calcula valor com desconto
+        desconto_percentual = gerador.DESCONTOS.get(desconto_key, 0.00)
+        valor_com_desconto = gerador.calcular_valor_final(valor_mensal, desconto_percentual)
+        
+        # Exibe os valores em colunas
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric(
+                label="Valor Mensal",
+                value=f"R$ {valor_mensal:.2f}",
+                delta=None
+            )
+        
+        with col2:
+            st.metric(
+                label="Taxa de Implantação",
+                value=f"R$ {taxa_impl:.2f}",
+                delta=None
+            )
+        
+        with col3:
+            st.metric(
+                label=f"Valor com Desconto ({desconto_pj})",
+                value=f"R$ {valor_com_desconto:.2f}",
+                delta=f"-R$ {valor_mensal - valor_com_desconto:.2f}",
+                delta_color="inverse"
+            )
+        
+        st.markdown("---")
+
     with tab_pf:
         st.subheader("Dados da Pessoa Física")
         
@@ -537,7 +603,73 @@ with col_form:
                 options=['Recorrente', 'Plano Integral no Cartão', 'PIX', 'Mensal'],
                 key="pf_pagamento"
             )
+
+        # Selecionar desconto
+    desconto_pf = st.selectbox(
+        "Desconto de Licença",
+        options=['0%', '5%', '10%', '15%', '20%'],
+        key="pf_desconto"
+    )
+    
+    # Seção de cálculo de valores (só aparece após preenchimento dos campos anteriores)
+    if tipo_licenca_pf and formato_pagamento_pf and qtd_equipos_pf:
+        st.markdown("---")
+        st.subheader("Resumo Financeiro")
         
+        # Encontra a chave de formato de pagamento
+        formato_key = {
+            'Recorrente': '1',
+            'Plano Integral no Cartão': '2',
+            'PIX': '3',
+            'Mensal': '4'
+        }.get(formato_pagamento_pf, '1')
+        
+        # Encontra a chave de desconto
+        desconto_key = {
+            '0%': '0',
+            '5%': '1',
+            '10%': '2',
+            '15%': '3',
+            '20%': '4'
+        }.get(desconto_pf, '0')
+        
+        # Calcula valor mensal da licença
+        valor_mensal = gerador.calcular_valor_licenca(tipo_licenca_key, formato_key, qtd_equipos_pf)
+        
+        # Calcula taxa de implantação
+        taxa_impl = gerador.TAXA_IMPLANTACAO.get(formato_key, 490.00)
+        
+        # Calcula valor com desconto
+        desconto_percentual = gerador.DESCONTOS.get(desconto_key, 0.00)
+        valor_com_desconto = gerador.calcular_valor_final(valor_mensal, desconto_percentual)
+        
+        # Exibe os valores em colunas
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric(
+                label="Valor Mensal",
+                value=f"R$ {valor_mensal:.2f}",
+                delta=None
+            )
+        
+        with col2:
+            st.metric(
+                label="Taxa de Implantação",
+                value=f"R$ {taxa_impl:.2f}",
+                delta=None
+            )
+        
+        with col3:
+            st.metric(
+                label=f"Valor com Desconto ({desconto_pf})",
+                value=f"R$ {valor_com_desconto:.2f}",
+                delta=f"-R$ {valor_mensal - valor_com_desconto:.2f}",
+                delta_color="inverse"
+            )
+        
+        st.markdown("---")
+
         if st.button("🔄 Gerar Contrato - PF", key="btn_pf"):
                 if not nome.strip():
                     st.error("❌ Por favor, preencha o nome completo.")
@@ -546,6 +678,25 @@ with col_form:
                 else:
                     try:
                         with st.spinner("⏳ Gerando contrato..."):
+                            formato_key = {
+                                'Recorrente': '1',
+                                'Plano Integral no Cartão': '2',
+                                'PIX': '3',
+                                'Mensal': '4'
+                            }.get(formato_pagamento_pf, '1')
+                            
+                            desconto_key = {
+                                '0%': '0',
+                                '5%': '1',
+                                '10%': '2',
+                                '15%': '3',
+                                '20%': '4'
+                            }.get(desconto_pf, '0')
+                            
+                            valor_mensal = gerador.calcular_valor_licenca(tipo_licenca_key, formato_key, qtd_equipos_pf)
+                            desconto_percentual = gerador.DESCONTOS.get(desconto_key, 0.00)
+                            valor_final = gerador.calcular_valor_final(valor_mensal, desconto_percentual)
+                            
                             caminho = gerador.gerar_contrato_pf(
                                 nome, 
                                 cpf, 
@@ -554,7 +705,10 @@ with col_form:
                                 qtd_equipos=qtd_equipos_pf,
                                 tipo_migracao=tipo_migracao_pf,
                                 observacao=observacao_pf,
-                                formato_pagamento=formato_pagamento_pf
+                                formato_pagamento=formato_pagamento_pf,
+                                valor_mensal=valor_mensal,
+                                valor_final=valor_final,
+                                desconto_percentual=desconto_percentual * 100
                             )
                         
                         st.success(f"✅ Contrato gerado com sucesso!")
