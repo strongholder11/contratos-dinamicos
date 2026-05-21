@@ -5,6 +5,11 @@ import streamlit as st
 from gerador_contratos import Gerador
 
 
+APP_DIR = Path(__file__).resolve().parent
+TEMPLATES_DIR = APP_DIR / "templates"
+CONTRATOS_GERADOS_DIR = APP_DIR / "contratos_gerados"
+
+
 st.set_page_config(
     page_title="Gerador de Contratos",
     page_icon=":page_facing_up:",
@@ -272,10 +277,10 @@ def encontrar_chave_licenca(gerador: Gerador, nome_licenca: str) -> str:
 
 def mostrar_download(caminho: Path) -> None:
     st.success("Contrato gerado com sucesso.")
-    st.info(f"Arquivo criado: `{caminho.name}`")
+    st.info(f"Arquivo: `{caminho.name}`")
     with open(caminho, "rb") as arquivo:
         st.download_button(
-            label="Baixar contrato",
+            label="Baixar Contrato",
             data=arquivo.read(),
             file_name=caminho.name,
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -338,8 +343,8 @@ with st.sidebar:
 
 aplicar_tema(modo_escuro)
 
-total_templates = len(list(Path("templates").glob("*.docx")))
-total_gerados = len(list(Path("contratos_gerados").glob("*.docx")))
+total_templates = len(list(TEMPLATES_DIR.glob("*.docx")))
+total_gerados = len(list(CONTRATOS_GERADOS_DIR.glob("*.docx")))
 
 st.markdown(
     f"""
@@ -465,15 +470,7 @@ with col_form:
                             valor_final=valor_com_desconto_pf,
                             desconto_percentual=desconto_pf,
                         )
-                    st.success("Contrato gerado com sucesso!")
-                    st.info(f"Arquivo: `{caminho.name}`")
-                    with open(caminho, "rb") as arquivo:
-                        st.download_button(
-                            label="Baixar Contrato",
-                            data=arquivo.read(),
-                            file_name=caminho.name,
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        )
+                    mostrar_download(caminho)
                 except ValueError as e:
                     st.error(f"Erro de validação: {e}")
                 except FileNotFoundError as e:
@@ -563,15 +560,7 @@ with col_form:
                             valor_final=valor_com_desconto_pj,
                             desconto_percentual=desconto_pj,
                         )
-                    st.success("Contrato gerado com sucesso!")
-                    st.info(f"Arquivo: `{caminho.name}`")
-                    with open(caminho, "rb") as arquivo:
-                        st.download_button(
-                            label="Baixar Contrato",
-                            data=arquivo.read(),
-                            file_name=caminho.name,
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        )
+                    mostrar_download(caminho)
                 except ValueError as e:
                     st.error(f"Erro de validação: {e}")
                 except FileNotFoundError as e:
