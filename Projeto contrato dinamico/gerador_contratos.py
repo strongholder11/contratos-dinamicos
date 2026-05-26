@@ -133,8 +133,9 @@ class Gerador:
     }
 
     def __init__(self):
-        self.caminho_templates = Path("templates")
-        self.caminho_saida = Path("contratos_gerados")
+        base_dir = Path(__file__).resolve().parent
+        self.caminho_templates = base_dir / "templates"
+        self.caminho_saida = base_dir / "contratos_gerados"
         self._criar_diretorios()
 
     def _criar_diretorios(self):
