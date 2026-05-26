@@ -425,6 +425,125 @@ with col_form:
             key="pf_desconto",
         )
 
+            # Campo de valor de entrada
+        valor_entrada_pf = st.number_input(
+            "Valor de Entrada (R$)",
+            min_value=0.0,
+            value=0.0,
+            step=100.0,
+            key="pf_entrada_final"
+        )
+    
+        # Campo de número de parcelas
+        num_parcelas_pf = st.number_input(
+            "Número de Parcelas",
+            min_value=1,
+            max_value=24,
+            value=12,
+            step=1,
+            key="pf_parcelas_final"
+        )
+    
+        # Agora sim, o resumo financeiro funciona (valor_entrada_pf EXISTE)
+        if tipo_licenca_pf and formato_pagamento_pf and qtd_equipos_pf:
+            st.markdown("---")
+            st.subheader("Resumo Financeiro")
+            # ... resto do código
+
+            tipo_licenca_key = [k for k, v in gerador.TIPOS_LICENCA.items() if v == tipo_licenca_pf][0]
+            # Seção de resumo financeiro (só aparece após preenchimento dos campos anteriores)
+            
+                
+            # Encontra a chave de formato de pagamento
+            formato_key = {
+                'Recorrente': '1',
+                'Plano Integral no Cartão': '2',
+                'PIX': '3',
+                'Mensal': '4'
+            }.get(formato_pagamento_pf, '1')
+            
+            # Encontra a chave de desconto
+            desconto_key = {
+                '0%': '0',
+                '5%': '1',
+                '10%': '2',
+                '15%': '3',
+                '20%': '4'
+            }.get(desconto_pf, '0')
+        
+        
+        # Calcula valor mensal da licença
+        valor_mensal = gerador.calcular_valor_licenca(tipo_licenca_key, formato_key, qtd_equipos_pf)
+        
+        # Calcula taxa de implantação
+        taxa_impl = gerador.TAXA_IMPLANTACAO.get(formato_key, 490.00)
+        
+        # Calcula valor com desconto
+        desconto_percentual = gerador.DESCONTOS.get(desconto_key, 0.00)
+        valor_com_desconto = gerador.calcular_valor_final(valor_mensal, desconto_percentual)
+        
+        # Exibe os valores em colunas
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric(
+                label="Valor Mensal",
+                value=f"R$ {valor_mensal:.2f}",
+                delta=None
+            )
+        
+        with col2:
+            st.metric(
+                label="Taxa de Implantação",
+                value=f"R$ {taxa_impl:.2f}",
+                delta=None
+            )
+        
+        with col3:
+            st.metric(
+                label=f"Valor com Desconto ({desconto_pf})",
+                value=f"R$ {valor_com_desconto:.2f}",
+                delta=f"-R$ {valor_mensal - valor_com_desconto:.2f}",
+                delta_color="inverse"
+            )
+        
+        st.markdown("---")
+        
+        # Resumo de entrada e parcelas
+        st.subheader("Detalhamento do Pagamento")
+        
+        saldo_restante = valor_com_desconto - valor_entrada_pf
+        valor_por_parcela = saldo_restante / num_parcelas_pf if num_parcelas_pf > 0 else 0
+        
+        col_entrada, col_saldo, col_parcela = st.columns(3)
+        
+        with col_entrada:
+            st.metric(
+                label="Entrada",
+                value=f"R$ {valor_entrada_pf:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            )
+        
+        with col_saldo:
+            st.metric(
+                label="Saldo Restante",
+                value=f"R$ {saldo_restante:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            )
+        
+        with col_parcela:
+            st.metric(
+                label=f"Valor por Parcela ({num_parcelas_pf}x)",
+                value=f"R$ {valor_por_parcela:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            )
+
+                # Campo de valor de entrada
+        valor_entrada_pf = st.number_input(
+            "Valor de Entrada (R$)",
+            min_value=0.0,
+            value=0.0,
+            step=100.0,
+            key="pf_entrada"
+        )
+
         formato_pf_key = {
             "Recorrente": "1",
             "Plano Integral no Cartão": "2",
@@ -449,35 +568,60 @@ with col_form:
         )
         st.markdown("---")
 
-        if st.button("Gerar Contrato - PF", key="btn_pf"):
+        tipo_licenca_key = [k for k, v in gerador.TIPOS_LICENCA.items() if v == tipo_licenca_pf][0]
+
+        if st.button("🔄 Gerar Contrato - PF", key="btn_pf"):
             if not nome.strip():
-                st.error("Por favor, preencha o nome completo.")
+                st.error("❌ Por favor, preencha o nome completo.")
             elif not cpf.strip():
-                st.error("Por favor, preencha o CPF.")
+                st.error("❌ Por favor, preencha o CPF.")
             else:
                 try:
-                    with st.spinner("Gerando contrato..."):
+                    with st.spinner("⏳ Gerando contrato..."):
+                        formato_key = {
+                            'Recorrente': '1',
+                            'Plano Integral no Cartão': '2',
+                            'PIX': '3',
+                            'Mensal': '4'
+                        }.get(formato_pagamento_pf, '1')
+                        
+                        desconto_key = {
+                            '0%': '0',
+                            '5%': '1',
+                            '10%': '2',
+                            '15%': '3',
+                            '20%': '4'
+                        }.get(desconto_pf, '0')
+                        
+                        
+
+                        valor_mensal = gerador.calcular_valor_licenca(tipo_licenca_key, formato_key, qtd_equipos_pf)
+                        desconto_percentual = gerador.DESCONTOS.get(desconto_key, 0.00)
+                        valor_final = gerador.calcular_valor_final(valor_mensal, desconto_percentual)
+                        
                         caminho = gerador.gerar_contrato_pf(
-                            nome,
-                            cpf,
-                            tipo_licenca_pf_key,
+                            nome, 
+                            cpf, 
+                            tipo_licenca_key,
                             tipo_implantacao=tipo_implantacao_pf,
                             qtd_equipos=qtd_equipos_pf,
                             tipo_migracao=tipo_migracao_pf,
                             observacao=observacao_pf,
                             formato_pagamento=formato_pagamento_pf,
-                            valor_mensal=valor_mensal_pf,
-                            valor_final=valor_com_desconto_pf,
-                            desconto_percentual=desconto_pf,
+                            valor_mensal=valor_mensal,
+                            valor_final=valor_final,
+                            desconto_percentual=desconto_percentual * 100,
+                            valor_entrada=valor_entrada_pf,
+                            num_parcelas=int(num_parcelas_pf)
                         )
                     mostrar_download(caminho)
                 except ValueError as e:
-                    st.error(f"Erro de validação: {e}")
+                    st.error(f"❌ Erro de validação: {e}")
                 except FileNotFoundError as e:
-                    st.error(f"Template não encontrado: {e}")
+                    st.error(f"❌ Template não encontrado: {e}")
                     st.warning("Verifique se os templates estão na pasta `/templates/`")
                 except Exception as e:
-                    st.error(f"Erro ao gerar contrato: {e}")
+                    st.error(f"❌ Erro ao gerar contrato: {e}")
 
     with tab_pj:
         st.subheader("Dados da Pessoa Jurídica")
@@ -515,6 +659,38 @@ with col_form:
             key="pj_desconto",
         )
 
+                # Encontrar tipo_licenca_key_pj
+        tipo_licenca_key_pj = [k for k, v in gerador.TIPOS_LICENCA.items() if v == tipo_licenca_pj][0]
+        
+        # Campo de valor de entrada
+        valor_entrada_pj = st.number_input(
+            "Valor de Entrada (R$)",
+            min_value=0.0,
+            value=0.0,
+            step=100.0,
+            key="pj_entrada_final"
+        )
+        
+        # Campo de número de parcelas
+        num_parcelas_pj = st.number_input(
+            "Número de Parcelas",
+            min_value=1,
+            max_value=24,
+            value=12,
+            step=1,
+            key="pj_parcelas_final"
+        )
+
+            # Campo de número de parcelas
+        num_parcelas_pf = st.number_input(
+            "Número de Parcelas",
+            min_value=1,
+            max_value=24,
+            value=12,
+            step=1,
+            key="pf_parcelas"
+        )
+
         formato_pj_key = {
             "Recorrente": "1",
             "Plano Integral no Cartão": "2",
@@ -537,37 +713,64 @@ with col_form:
             f"-R$ {valor_mensal_pj - valor_com_desconto_pj:.2f}",
             delta_color="inverse",
         )
+
+        tipo_licenca_key = [k for k, v in gerador.TIPOS_LICENCA.items() if v == tipo_licenca_pf][0]
+        
         st.markdown("---")
 
-        if st.button("Gerar Contrato - PJ", key="btn_pj"):
+        
+        if st.button("🔄 Gerar Contrato - PJ", key="btn_pj"):
             if not razao_social.strip():
-                st.error("Por favor, preencha a razão social.")
+                st.error("❌ Por favor, preencha a razão social.")
             elif not cnpj.strip():
-                st.error("Por favor, preencha o CNPJ.")
+                st.error("❌ Por favor, preencha o CNPJ.")
             else:
                 try:
-                    with st.spinner("Gerando contrato..."):
+                    with st.spinner("⏳ Gerando contrato..."):
+                        formato_key = {
+                            'Recorrente': '1',
+                            'Plano Integral no Cartão': '2',
+                            'PIX': '3',
+                            'Mensal': '4'
+                        }.get(formato_pagamento_pj, '1')
+                        
+                        desconto_key = {
+                            '0%': '0',
+                            '5%': '1',
+                            '10%': '2',
+                            '15%': '3',
+                            '20%': '4'
+                        }.get(desconto_pj, '0')
+
+                        
+                        
+                        valor_mensal = gerador.calcular_valor_licenca(tipo_licenca_key, formato_key, qtd_equipos_pj)
+                        desconto_percentual = gerador.DESCONTOS.get(desconto_key, 0.00)
+                        valor_final = gerador.calcular_valor_final(valor_mensal, desconto_percentual)
+                        
                         caminho = gerador.gerar_contrato_pj(
                             razao_social,
                             cnpj,
-                            tipo_licenca_pj_key,
+                            tipo_licenca_key,
                             tipo_implantacao=tipo_implantacao_pj,
                             qtd_equipos=qtd_equipos_pj,
                             tipo_migracao=tipo_migracao_pj,
                             observacao=observacao_pj,
                             formato_pagamento=formato_pagamento_pj,
-                            valor_mensal=valor_mensal_pj,
-                            valor_final=valor_com_desconto_pj,
-                            desconto_percentual=desconto_pj,
+                            valor_mensal=valor_mensal,
+                            valor_final=valor_final,
+                            desconto_percentual=desconto_percentual * 100,
+                            valor_entrada=valor_entrada_pj,
+                            num_parcelas=int(num_parcelas_pj)
                         )
                     mostrar_download(caminho)
                 except ValueError as e:
-                    st.error(f"Erro de validação: {e}")
+                    st.error(f"❌ Erro de validação: {e}")
                 except FileNotFoundError as e:
-                    st.error(f"Template não encontrado: {e}")
+                    st.error(f"❌ Template não encontrado: {e}")
                     st.warning("Verifique se os templates estão na pasta `/templates/`")
                 except Exception as e:
-                    st.error(f"Erro ao gerar contrato: {e}")
+                    st.error(f"❌ Erro ao gerar contrato: {e}")
 with col_preview:
     st.markdown(
         """

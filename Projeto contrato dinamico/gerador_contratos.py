@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
-
 from docx import Document
 from docx.text.paragraph import Paragraph
 from docx.oxml import OxmlElement
@@ -371,108 +371,222 @@ class Gerador:
             self.montar_clausula_implantacao(tipo_licenca, tipo_implantacao, tipo_migracao),
         )
 
-    def gerar_contrato_pf(
-        self,
-        nome,
-        cpf,
-        tipo_licenca,
-        tipo_implantacao=None,
-        qtd_equipos=None,
-        tipo_migracao=None,
-        observacao=None,
-        formato_pagamento=None,
-        valor_mensal=None,
-        valor_final=None,
-        desconto_percentual=0.0,
-    ):
+    def gerar_contrato_pf(self, nome, cpf, tipo_licenca, tipo_implantacao=None, qtd_equipos=None, tipo_migracao=None, observacao=None, formato_pagamento=None, valor_mensal=None, valor_final=None, desconto_percentual=None, valor_entrada=None, num_parcelas=None):
+        #"""Gera contrato para pessoa física"""
+        # Validação
         cpf_limpo = ValidadorDados.validar_cpf(cpf)
         cpf_formatado = ValidadorDados.formatar_cpf(cpf_limpo)
-        caminho_template = self._mapear_template(self.TIPOS_LICENCA[tipo_licenca])
+        
+        # Carrega template único
+        caminho_template = self.caminho_templates / "Contrato-Aplicativo-Net--MODELO-Placeholder.docx"
+        if not caminho_template.exists():
+            raise FileNotFoundError(f"Template não encontrado: {caminho_template}")
+        
         doc = Document(caminho_template)
+        
+        # Normaliza valores
+        tipo_migracao_norm = self._normalizar_migracao(tipo_migracao)
+        
+        # Calcula valores padrão se não informados
+        if valor_entrada is None:
+            valor_entrada = valor_final * 0.5 if valor_final else 0.0
+        
+        if num_parcelas is None:
+            num_parcelas = 12
+        
+        # Converte número para extenso
+        def numero_para_extenso(num):
+            numeros_extenso = {
+                1: "uma", 2: "duas", 3: "três", 4: "quatro", 5: "cinco",
+                6: "seis", 7: "sete", 8: "oito", 9: "nove", 10: "dez",
+                11: "onze", 12: "doze", 13: "treze", 14: "catorze", 15: "quinze",
+                16: "dezesseis", 17: "dezessete", 18: "dezoito", 19: "dezenove", 20: "vinte",
+            }
+            return numeros_extenso.get(int(num), str(num))
 
-        self.aplicar_clausulas_condicionais(
-            doc,
-            tipo_licenca,
-            formato_pagamento,
-            qtd_equipos,
-            tipo_implantacao,
-            tipo_migracao,
-            desconto_percentual / 100 if desconto_percentual > 1 else desconto_percentual,
-        )
+        parcelas_extenso = numero_para_extenso(num_parcelas)
 
+        # Calcula implantação e migração
+        taxa_impl = self.TAXA_IMPLANTACAO.get(self._normalizar_formato_pagamento(formato_pagamento), 490.00)
+
+        valor_migracao = 0.0
+        parcelas_migracao = 0
+        valor_parcela_migracao = 0.0
+
+        if tipo_migracao_norm == "inteligente":
+            valor_migracao = self.MIGRACAO_INTELIGENTE_VALOR
+            parcelas_migracao = self.MIGRACAO_INTELIGENTE_PARCELAS
+            valor_parcela_migracao = (
+                valor_migracao / parcelas_migracao if parcelas_migracao > 0 else 0.0
+            )
+
+        # Calcula valor da parcela
+        valor_parcela = (valor_final - valor_entrada) / num_parcelas if num_parcelas > 0 else 0.0
+
+        # Prepara substituições
         substituicoes = {
-            "{NOME_CLIENTE}": nome,
-            "{RAZAO_SOCIAL}": nome,
-            "{CPF}": cpf_formatado,
-            "{CNPJ}": cpf_formatado,
-            "{TIPO_LICENCA}": self.TIPOS_LICENCA[tipo_licenca],
-            "{TIPO_IMPLANTACAO}": tipo_implantacao,
-            "{QTD_EQUIPOS}": qtd_equipos,
-            "{TIPO_MIGRACAO}": tipo_migracao,
-            "{OBSERVACAO}": observacao,
-            "{FORMATO_PAGAMENTO}": formato_pagamento,
-            "{DATA}": datetime.now().strftime("%d/%m/%Y"),
-            "{DATA_BR}": datetime.now().strftime("%d/%m/%Y"),
+            '[NOMEOURAZAO]': nome,
+            '[CONTRATANTE]': nome,
+            '[CPF/CNPJ]': cpf_formatado,
+            '[CPFCONTRATANTE]': cpf_formatado,
+            '[NUMEROPROPOSTA]': datetime.now().strftime('%Y%m%d%H%M%S'),
+            '[TIPODELICENÇA]': self.TIPOS_LICENCA[tipo_licenca],
+            '[NEQUIPOS]': str(qtd_equipos),
+            '[TABELAPRECO]': self._dinheiro(valor_mensal) if valor_mensal else "R$ 0,00",
+            '[VALORFINAL]': self._dinheiro(valor_final) if valor_final else "R$ 0,00",
+            '[VALORENTRADA]': self._dinheiro(valor_entrada),
+            '[PARCELAS]': str(int(num_parcelas)),
+            '[PARCELASEXTENSO]': parcelas_extenso,
+            '[VALORPARCELA]': self._dinheiro(valor_parcela),
+            '[TAXAIMPLANTACAO]': self._dinheiro(taxa_impl),
+            '[VALORMIGRACAO]': self._dinheiro(valor_migracao) if valor_migracao > 0 else "R$ 0,00",
+            '[PARCELASMIGRACAO]': str(int(parcelas_migracao)) if parcelas_migracao > 0 else "0",
+            '[VALORPARCELAMIGRACAO]': self._dinheiro(valor_parcela_migracao) if valor_parcela_migracao > 0 else "R$ 0,00",
+            '[VALIDADELICENCA]': (datetime.now() + timedelta(days=365)).strftime('%d/%m/%Y'),
         }
 
+        # Substitui em todo o documento
         self._substituir_em_corpo(doc, substituicoes)
         self._substituir_em_tabelas(doc, substituicoes)
 
+        # Trata cláusula de implantação/migração
+        self._aplicar_clausula_implantacao_condicional(doc, tipo_migracao_norm)
+
+        # Salva arquivo
         nome_arquivo = f"{nome}_{cpf_limpo}_{self.TIPOS_LICENCA[tipo_licenca]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
-        caminho_saida = self.caminho_saida / self._limpar_nome_arquivo(nome_arquivo)
+        nome_arquivo = self._limpar_nome_arquivo(nome_arquivo)
+        caminho_saida = self.caminho_saida / nome_arquivo
         doc.save(caminho_saida)
+
         return caminho_saida
 
-    def gerar_contrato_pj(
-        self,
-        razao_social,
-        cnpj,
-        tipo_licenca,
-        tipo_implantacao=None,
-        qtd_equipos=None,
-        tipo_migracao=None,
-        observacao=None,
-        formato_pagamento=None,
-        valor_mensal=None,
-        valor_final=None,
-        desconto_percentual=0.0,
-    ):
+    def gerar_contrato_pj(self, razao_social, cnpj, tipo_licenca, tipo_implantacao=None, qtd_equipos=None, tipo_migracao=None, observacao=None, formato_pagamento=None, valor_mensal=None, valor_final=None, desconto_percentual=None, valor_entrada=None, num_parcelas=None):
+        #"""Gera contrato para pessoa jurídica"""
+        # Validação
         cnpj_limpo = ValidadorDados.validar_cnpj(cnpj)
         cnpj_formatado = ValidadorDados.formatar_cnpj(cnpj_limpo)
-        caminho_template = self._mapear_template(self.TIPOS_LICENCA[tipo_licenca])
+        
+        # Carrega template único
+        caminho_template = self.caminho_templates / "Contrato-Aplicativo-Net--MODELO-Placeholder.docx"
+        if not caminho_template.exists():
+            raise FileNotFoundError(f"Template não encontrado: {caminho_template}")
+        
         doc = Document(caminho_template)
-
-        self.aplicar_clausulas_condicionais(
-            doc,
-            tipo_licenca,
-            formato_pagamento,
-            qtd_equipos,
-            tipo_implantacao,
-            tipo_migracao,
-            desconto_percentual / 100 if desconto_percentual > 1 else desconto_percentual,
-        )
-
+        
+        # Normaliza valores
+        tipo_migracao_norm = self._normalizar_migracao(tipo_migracao)
+        
+        # Calcula valores padrão se não informados
+        if valor_entrada is None:
+            valor_entrada = valor_final * 0.5 if valor_final else 0.0
+        
+        if num_parcelas is None:
+            num_parcelas = 12
+        
+        # Calcula valor da parcela
+        saldo_restante = (valor_final or 0.0) - valor_entrada
+        valor_parcela = saldo_restante / num_parcelas if num_parcelas > 0 else 0.0
+        
+        # Converte número para extenso
+        def numero_para_extenso(num):
+            numeros_extenso = {
+                1: "uma", 2: "duas", 3: "três", 4: "quatro", 5: "cinco",
+                6: "seis", 7: "sete", 8: "oito", 9: "nove", 10: "dez",
+                11: "onze", 12: "doze", 13: "treze", 14: "catorze", 15: "quinze",
+                16: "dezesseis", 17: "dezessete", 18: "dezoito", 19: "dezenove", 20: "vinte"
+            }
+            return numeros_extenso.get(int(num), str(num))
+        
+        parcelas_extenso = numero_para_extenso(num_parcelas)
+        
+        # Calcula implantação e migração
+        taxa_impl = self.TAXA_IMPLANTACAO.get(self._normalizar_formato_pagamento(formato_pagamento), 490.00)
+        
+        valor_migracao = 0.0
+        parcelas_migracao = 0
+        valor_parcela_migracao = 0.0
+        
+        if tipo_migracao_norm == "inteligente":
+            valor_migracao = self.MIGRACAO_INTELIGENTE_VALOR
+            parcelas_migracao = self.MIGRACAO_INTELIGENTE_PARCELAS
+            valor_parcela_migracao = valor_migracao / parcelas_migracao if parcelas_migracao > 0 else 0.0
+        
+        # Prepara substituições
         substituicoes = {
-            "{NOME_CLIENTE}": razao_social,
-            "{RAZAO_SOCIAL}": razao_social,
-            "{CNPJ}": cnpj_formatado,
-            "{TIPO_LICENCA}": self.TIPOS_LICENCA[tipo_licenca],
-            "{TIPO_IMPLANTACAO}": tipo_implantacao,
-            "{QTD_EQUIPOS}": qtd_equipos,
-            "{TIPO_MIGRACAO}": tipo_migracao,
-            "{OBSERVACAO}": observacao,
-            "{FORMATO_PAGAMENTO}": formato_pagamento,
-            "{DATA}": datetime.now().strftime("%d/%m/%Y"),
-            "{DATA_BR}": datetime.now().strftime("%d/%m/%Y"),
+            '[NOMEOURAZAO]': razao_social,
+            '[CONTRATANTE]': razao_social,
+            '[CPF/CNPJ]': cnpj_formatado,
+            '[CPFCONTRATANTE]': cnpj_formatado,
+            '[NUMEROPROPOSTA]': datetime.now().strftime('%Y%m%d%H%M%S'),
+            '[TIPODELICENÇA]': self.TIPOS_LICENCA[tipo_licenca],
+            '[NEQUIPOS]': str(qtd_equipos),
+            '[TABELAPRECO]': self._dinheiro(valor_mensal) if valor_mensal else "R$ 0,00",
+            '[VALORFINAL]': self._dinheiro(valor_final) if valor_final else "R$ 0,00",
+            '[VALORENTRADA]': self._dinheiro(valor_entrada),
+            '[PARCELAS]': str(int(num_parcelas)),
+            '[PARCELASEXTENSO]': parcelas_extenso,
+            '[VALORPARCELA]': self._dinheiro(valor_parcela),
+            '[TAXAIMPLANTACAO]': self._dinheiro(taxa_impl),
+            '[VALORMIGRACAO]': self._dinheiro(valor_migracao) if valor_migracao > 0 else "R$ 0,00",
+            '[PARCELASMIGRACAO]': str(int(parcelas_migracao)) if parcelas_migracao > 0 else "0",
+            '[VALORPARCELAMIGRACAO]': self._dinheiro(valor_parcela_migracao) if valor_parcela_migracao > 0 else "R$ 0,00",
+            '[VALIDADELICENCA]': (datetime.now() + timedelta(days=365)).strftime('%d/%m/%Y'),
         }
-
+        
+        # Substitui em todo o documento
         self._substituir_em_corpo(doc, substituicoes)
         self._substituir_em_tabelas(doc, substituicoes)
-
+        
+        # Trata cláusula de implantação/migração
+        self._aplicar_clausula_implantacao_condicional(doc, tipo_migracao_norm)
+        
+        # Salva arquivo
         nome_arquivo = f"{razao_social}_{cnpj_limpo}_{self.TIPOS_LICENCA[tipo_licenca]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
-        caminho_saida = self.caminho_saida / self._limpar_nome_arquivo(nome_arquivo)
+        nome_arquivo = self._limpar_nome_arquivo(nome_arquivo)
+        caminho_saida = self.caminho_saida / nome_arquivo
         doc.save(caminho_saida)
+        
         return caminho_saida
+
+    def _aplicar_clausula_implantacao_condicional(self, doc, tipo_migracao):
+        #"""Remove a cláusula de implantação que não foi escolhida"""
+        # Localiza os parágrafos das duas opções
+        opcao1_encontrada = False
+        opcao2_encontrada = False
+        parafos_opcao1 = []
+        parafos_opcao2 = []
+        em_opcao1 = False
+        em_opcao2 = False
+        
+        for i, parafo in enumerate(doc.paragraphs):
+            texto = parafo.text.strip()
+            
+            # Marca início da Opção 1 (Padrão)
+            if "Implantação Padrão" in texto or "10 a 15 dias" in texto:
+                em_opcao1 = True
+                opcao1_encontrada = True
+            
+            # Marca início da Opção 2 (Completa)
+            if "Opção 02" in texto or "Migração Completa" in texto:
+                em_opcao2 = True
+                opcao2_encontrada = True
+                em_opcao1 = False
+            
+            # Coleta parágrafos por opção
+            if em_opcao1 and not em_opcao2:
+                parafos_opcao1.append(parafo)
+            elif em_opcao2:
+                parafos_opcao2.append(parafo)
+        
+        # Remove a opção não selecionada
+        if tipo_migracao == "inteligente":
+            # Mantém Opção 2, remove Opção 1
+            for parafo in parafos_opcao1:
+                self._remover_paragrafo(parafo)
+        else:
+            # Mantém Opção 1, remove Opção 2
+            for parafo in parafos_opcao2:
+                self._remover_paragrafo(parafo)
 
     def _limpar_nome_arquivo(self, nome_arquivo):
         return re.sub(r'[<>:"/\\|?*]', "_", nome_arquivo)
@@ -481,6 +595,20 @@ class Gerador:
         print("\n--- TIPOS DE LICENÇA ---")
         for chave, nome in self.TIPOS_LICENCA.items():
             print(f"{chave} - {nome}")
+
+    def _normalizar_migracao(self, tipo_migracao):
+    #"""Normaliza o tipo de migração"""
+        if tipo_migracao is None:
+            return "isento"
+        
+        tipo_lower = str(tipo_migracao).lower().strip()
+        
+        if "inteligente" in tipo_lower or "smart" in tipo_lower or "completa" in tipo_lower:
+            return "inteligente"
+        elif "padrão" in tipo_lower or "padrao" in tipo_lower or "basico" in tipo_lower:
+            return "padrao"
+        else:
+            return "isento"
 
 
 def main():
