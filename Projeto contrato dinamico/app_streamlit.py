@@ -386,7 +386,11 @@ with col_form:
 
     with tab_pf:
         st.subheader("Dados da Pessoa Física")
-
+        plataforma_pf = st.selectbox(
+        "Plataforma",
+        options=["ControleODONTO", "ControleMEDICO", "ControleVET"],
+        key="plataforma_pf"
+    )
         nome = st.text_input("Nome Completo", placeholder="João da Silva", key="pf_nome")
         cpf = st.text_input("CPF", placeholder="123.456.789-01 ou 12345678901", key="pf_cpf")
         tipo_licenca_pf = st.selectbox("Tipo de Licença", options=list(gerador.TIPOS_LICENCA.values()), key="pf_licenca")
@@ -409,6 +413,14 @@ with col_form:
             options=["Recorrente", "Plano Integral no Cartão", "PIX", "Mensal"],
             key="pf_pagamento",
         )
+        valor_migracao_inteligente_pf = st.number_input(
+        "Valor Migração Inteligente (R$)",
+        min_value=0.0,
+        value=2500.0,
+        step=100.0,
+        key="pf_valor_migracao"
+        )
+
         desconto_pf = st.number_input(
             "Desconto de Licença",
             min_value=0.0,
@@ -420,6 +432,10 @@ with col_form:
             key="pf_desconto",
         )
 
+        valor_entrada_pf = st.number_input("Valor de Entrada (R$)", min_value=0.0, step=100.0, key="pf_entrada_valor")
+        valor_taxa_implantacao_pf = st.number_input("Valor Taxa de Implantação (R$)", min_value=0.0, value=490.0, step=10.0, key="pf_valor_taxa_implantacao")
+        num_parcelas_pf = st.number_input("Número de Parcelas", min_value=1, max_value=24, value=12, key="pf_num_parcelas")
+
         formato_pf_key = {
             "Recorrente": "1",
             "Plano Integral no Cartão": "2",
@@ -427,22 +443,44 @@ with col_form:
             "Mensal": "4",
         }.get(formato_pagamento_pf, "1")
         valor_mensal_pf = gerador.calcular_valor_licenca(tipo_licenca_pf_key, formato_pf_key, qtd_equipos_pf)
-        taxa_impl_pf = gerador.TAXA_IMPLANTACAO.get(formato_pf_key, 490.00)
+        taxa_impl_pf = valor_taxa_implantacao_pf
         desconto_percentual_pf = desconto_pf / 100
         valor_com_desconto_pf = gerador.calcular_valor_final(valor_mensal_pf, desconto_percentual_pf)
 
         st.markdown("---")
         st.subheader("Resumo Financeiro")
+        # Calcular valor total da venda
+        saldo_restante_pf = valor_com_desconto_pf - valor_entrada_pf
+        valor_por_parcela_pf = saldo_restante_pf / num_parcelas_pf if num_parcelas_pf > 0 else 0
+        
+        # Valor total = entrada + taxa implantação + migração inteligente + (parcela × quantidade)
+        valor_migracao_calc = valor_migracao_inteligente_pf if tipo_migracao_pf == "Inteligente" else 0
+        valor_total_venda = valor_entrada_pf + taxa_impl_pf + valor_migracao_calc + (valor_por_parcela_pf * num_parcelas_pf)
+        
         col1, col2, col3 = st.columns(3)
-        col1.metric("Valor Mensal", f"R$ {valor_mensal_pf:.2f}")
-        col2.metric("Taxa de Implantação", f"R$ {taxa_impl_pf:.2f}")
-        col3.metric(
-            f"Valor com Desconto ({desconto_pf:.2f}%)",
-            f"R$ {valor_com_desconto_pf:.2f}",
-            f"-R$ {valor_mensal_pf - valor_com_desconto_pf:.2f}",
-            delta_color="inverse",
-        )
+        with col1:
+            st.metric("Valor Total da Venda", f"R$ {valor_total_venda:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        with col2:
+            st.metric("Taxa de Implantação", f"R$ {taxa_impl_pf:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        with col3:
+            st.metric(f"Valor com Desconto ({desconto_pf})", f"R$ {valor_com_desconto_pf:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
         st.markdown("---")
+        st.subheader("Detalhamento do Pagamento")
+
+        saldo_restante_pf = valor_com_desconto_pf - valor_entrada_pf
+        valor_por_parcela_pf = saldo_restante_pf / num_parcelas_pf if num_parcelas_pf > 0 else 0
+
+        col_entrada, col_saldo, col_parcela = st.columns(3)
+
+        with col_entrada:
+            st.metric("Entrada", f"R$ {valor_entrada_pf:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
+        with col_saldo:
+            st.metric("Saldo Restante", f"R$ {saldo_restante_pf:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
+        with col_parcela:
+            st.metric(f"Valor por Parcela ({num_parcelas_pf}x)", f"R$ {valor_por_parcela_pf:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
         if st.button("Gerar Contrato - PF", key="btn_pf"):
             if not nome.strip():
@@ -464,6 +502,11 @@ with col_form:
                             valor_mensal=valor_mensal_pf,
                             valor_final=valor_com_desconto_pf,
                             desconto_percentual=desconto_pf,
+                            valor_entrada=valor_entrada_pf,
+                            num_parcelas=int(num_parcelas_pf),
+                            plataforma=plataforma_pf,
+                            valor_migracao_inteligente=valor_migracao_inteligente_pf,
+                            valor_taxa_implantacao=valor_taxa_implantacao_pf
                         )
                     st.success("Contrato gerado com sucesso!")
                     st.info(f"Arquivo: `{caminho.name}`")
@@ -485,6 +528,11 @@ with col_form:
     with tab_pj:
         st.subheader("Dados da Pessoa Jurídica")
 
+        plataforma_pj = st.selectbox(
+        "Plataforma",
+        options=["ControleODONTO", "ControleMEDICO", "ControleVET"],
+        key="plataforma_pj"
+    )
         razao_social = st.text_input("Razão Social", placeholder="Ex: Empresa LTDA", key="pj_razao_social")
         cnpj = st.text_input("CNPJ", placeholder="12.345.678/0001-90 ou 12345678000190", key="pj_cnpj")
         tipo_licenca_pj = st.selectbox("Tipo de Licença", options=list(gerador.TIPOS_LICENCA.values()), key="pj_licenca")
@@ -507,6 +555,23 @@ with col_form:
             options=["Recorrente", "Plano Integral no Cartão", "PIX", "Mensal"],
             key="pj_pagamento",
         )
+
+        valor_migracao_inteligente_pj = st.number_input(
+        "Valor Migração Inteligente (R$)",
+        min_value=0.0,
+        value=2500.0,
+        step=100.0,
+        key="pj_valor_migracao"
+        )
+
+        valor_taxa_implantacao_pj = st.number_input(
+        "Valor Taxa de Implantação (R$)",
+        min_value=0.0,
+        value=490.0,
+        step=10.0,
+        key="pj_valor_taxa_implantacao"
+        )
+
         desconto_pj = st.number_input(
             "Desconto de Licença",
             min_value=0.0,
@@ -518,6 +583,21 @@ with col_form:
             key="pj_desconto",
         )
 
+        valor_entrada_pj = st.number_input(
+            "Valor de Entrada (R$)",
+            min_value=0.0,
+            step=100.0,
+            value=0.0,
+            key="pj_entrada_valor",
+        )
+        num_parcelas_pj = st.number_input(
+            "Número de Parcelas",
+            min_value=1,
+            max_value=24,
+            value=12,
+            key="pj_num_parcelas",
+        )
+
         formato_pj_key = {
             "Recorrente": "1",
             "Plano Integral no Cartão": "2",
@@ -525,21 +605,29 @@ with col_form:
             "Mensal": "4",
         }.get(formato_pagamento_pj, "1")
         valor_mensal_pj = gerador.calcular_valor_licenca(tipo_licenca_pj_key, formato_pj_key, qtd_equipos_pj)
-        taxa_impl_pj = gerador.TAXA_IMPLANTACAO.get(formato_pj_key, 490.00)
+        taxa_impl = valor_taxa_implantacao_pj
         desconto_percentual_pj = desconto_pj / 100
         valor_com_desconto_pj = gerador.calcular_valor_final(valor_mensal_pj, desconto_percentual_pj)
 
         st.markdown("---")
         st.subheader("Resumo Financeiro")
+        
+        # Calcular valor total da venda
+        saldo_restante_pj = valor_com_desconto_pj - valor_entrada_pj
+        valor_por_parcela_pj = saldo_restante_pj / num_parcelas_pj if num_parcelas_pj > 0 else 0
+        
+        # Valor total = entrada + taxa implantação + migração inteligente + (parcela × quantidade)
+        valor_migracao_calc = valor_migracao_inteligente_pj if tipo_migracao_pj == "Inteligente" else 0
+        valor_total_venda = valor_entrada_pj + taxa_impl + valor_migracao_calc + (valor_por_parcela_pj * num_parcelas_pj)
+        
         col1, col2, col3 = st.columns(3)
-        col1.metric("Valor Mensal", f"R$ {valor_mensal_pj:.2f}")
-        col2.metric("Taxa de Implantação", f"R$ {taxa_impl_pj:.2f}")
-        col3.metric(
-            f"Valor com Desconto ({desconto_pj:.2f}%)",
-            f"R$ {valor_com_desconto_pj:.2f}",
-            f"-R$ {valor_mensal_pj - valor_com_desconto_pj:.2f}",
-            delta_color="inverse",
-        )
+        with col1:
+            st.metric("Valor Total da Venda", f"R$ {valor_total_venda:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        with col2:
+            st.metric("Taxa de Implantação", f"R$ {taxa_impl:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        with col3:
+            st.metric(f"Valor com Desconto ({desconto_pj})", f"R$ {valor_com_desconto_pj:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
         st.markdown("---")
 
         if st.button("Gerar Contrato - PJ", key="btn_pj"):
@@ -562,6 +650,10 @@ with col_form:
                             valor_mensal=valor_mensal_pj,
                             valor_final=valor_com_desconto_pj,
                             desconto_percentual=desconto_pj,
+                            valor_entrada=valor_entrada_pj,
+                            num_parcelas=int(num_parcelas_pj),
+                            plataforma=plataforma_pj,
+                            valor_taxa_implantacao=valor_taxa_implantacao_pj,
                         )
                     st.success("Contrato gerado com sucesso!")
                     st.info(f"Arquivo: `{caminho.name}`")
