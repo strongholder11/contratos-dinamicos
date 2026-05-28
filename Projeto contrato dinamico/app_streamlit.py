@@ -393,6 +393,7 @@ with col_form:
     )
         nome = st.text_input("Nome Completo", placeholder="João da Silva", key="pf_nome")
         cpf = st.text_input("CPF", placeholder="123.456.789-01 ou 12345678901", key="pf_cpf")
+        nome_clinica_pf = st.text_input("Nome da Clínica", key="pf_nome_clinica")
         tipo_licenca_pf = st.selectbox("Tipo de Licença", options=list(gerador.TIPOS_LICENCA.values()), key="pf_licenca")
 
         tipo_implantacao_pf = None
@@ -422,7 +423,7 @@ with col_form:
         )
 
         desconto_pf = st.number_input(
-            "Desconto de Licença",
+            "Desconto de Licença (%)",
             min_value=0.0,
             max_value=100.0,
             value=0.0,
@@ -434,7 +435,7 @@ with col_form:
 
         valor_entrada_pf = st.number_input("Valor de Entrada (R$)", min_value=0.0, step=100.0, key="pf_entrada_valor")
         valor_taxa_implantacao_pf = st.number_input("Valor Taxa de Implantação (R$)", min_value=0.0, value=490.0, step=10.0, key="pf_valor_taxa_implantacao")
-        num_parcelas_pf = st.number_input("Número de Parcelas", min_value=1, max_value=24, value=12, key="pf_num_parcelas")
+        num_parcelas_pf = st.number_input("Número de Parcelas", min_value=1, max_value=12, value=11, key="pf_num_parcelas")
 
         formato_pf_key = {
             "Recorrente": "1",
@@ -457,10 +458,10 @@ with col_form:
         valor_migracao_calc = valor_migracao_inteligente_pf if tipo_migracao_pf == "Inteligente" else 0
         valor_total_venda = valor_entrada_pf + taxa_impl_pf + valor_migracao_calc + (valor_por_parcela_pf * num_parcelas_pf)
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         with col1:
             st.metric("Valor Total da Venda", f"R$ {valor_total_venda:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-            st.metric("Valor Migração", f"R$ {valor_migracao_inteligente_pf:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            st.metric("Valor Migração Inteligente", f"R$ {valor_migracao_inteligente_pf:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
         with col2:
             st.metric("Taxa de Implantação", f"R$ {taxa_impl_pf:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
@@ -469,7 +470,7 @@ with col_form:
         st.markdown("---")
         st.subheader("Detalhamento do Pagamento")
 
-        saldo_restante_pf = valor_com_desconto_pf - valor_entrada_pf
+        saldo_restante_pf = valor_total_venda - valor_entrada_pf
         valor_por_parcela_pf = saldo_restante_pf / num_parcelas_pf if num_parcelas_pf > 0 else 0
 
         col_entrada, col_saldo, col_parcela = st.columns(3)
@@ -536,6 +537,7 @@ with col_form:
     )
         razao_social = st.text_input("Razão Social", placeholder="Ex: Empresa LTDA", key="pj_razao_social")
         cnpj = st.text_input("CNPJ", placeholder="12.345.678/0001-90 ou 12345678000190", key="pj_cnpj")
+        
         tipo_licenca_pj = st.selectbox("Tipo de Licença", options=list(gerador.TIPOS_LICENCA.values()), key="pj_licenca")
 
         tipo_implantacao_pj = None
@@ -574,7 +576,7 @@ with col_form:
         )
 
         desconto_pj = st.number_input(
-            "Desconto de Licença",
+            "Desconto de Licença (%)",
             min_value=0.0,
             max_value=100.0,
             value=0.0,
@@ -594,8 +596,8 @@ with col_form:
         num_parcelas_pj = st.number_input(
             "Número de Parcelas",
             min_value=1,
-            max_value=24,
-            value=12,
+            max_value=12,
+            value=11,
             key="pj_num_parcelas",
         )
 
@@ -617,17 +619,18 @@ with col_form:
         saldo_restante_pj = valor_com_desconto_pj - valor_entrada_pj
         valor_por_parcela_pj = saldo_restante_pj / num_parcelas_pj if num_parcelas_pj > 0 else 0
         
-        # Valor total = entrada + taxa implantação + migração inteligente + (parcela × quantidade)
-        valor_migracao_calc = valor_migracao_inteligente_pj if tipo_migracao_pj == "Inteligente" else 0
-        valor_total_venda = valor_entrada_pj + taxa_impl + valor_migracao_calc + (valor_por_parcela_pj * num_parcelas_pj)
+        # Valor total = entrada + taxa implantação + migração inteligente + valor da licença (parcela × quantidade)
+        valor_migracao_calc_pj = valor_migracao_inteligente_pj if tipo_migracao_pj == "Inteligente" else 0
+        valor_total_venda = valor_entrada_pj + taxa_impl + valor_migracao_calc_pj + (valor_por_parcela_pj * num_parcelas_pj)
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         with col1:
             st.metric("Valor Total da Venda", f"R$ {valor_total_venda:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            st.metric("Valor Migração Inteligente", f"R$ {valor_migracao_calc_pj:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
         with col2:
             st.metric("Taxa de Implantação", f"R$ {taxa_impl:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        with col3:
-            st.metric(f"Valor da licença ({desconto_pj})", f"R$ {valor_com_desconto_pj:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            st.metric(f"Valor da Licença ({desconto_pj})", f"R$ {valor_com_desconto_pj:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
         st.markdown("---")
 

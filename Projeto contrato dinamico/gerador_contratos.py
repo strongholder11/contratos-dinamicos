@@ -69,31 +69,31 @@ class Gerador:
     }
 
     TABELA_PRECOS = {
-        "1": {
+        "SMART": {
             "1": {1: 164.00*12, 2: 164.00*12},
             "2": {1: 149.00*12, 2: 149.00*12},
             "3": {1: 149.00*12, 2: 149.00*12},
             "4": {1: 276.00*12, 2: 276.00*12},
         },
-        "2": {
+        "CLINIC (1 a 2 equipos/consultorios)": {
             "1": {1: 249.00*12, 2: 249.00*12},
             "2": {1: 220.80*12, 2: 220.80*12},
             "3": {1: 220.80*12, 2: 220.80*12},
             "4": {1: 276.00*12, 2: 276.00*12},
         },
-        "3": {
+        "CLINIC (3 a 4 equipos/consultorios)": {
             "1": {3: 388.00*12, 4: 388.00*12},
             "2": {3: 345.60*12, 4: 345.60*12},
             "3": {3: 345.60*12, 4: 345.60*12},
             "4": {3: 432.00*12, 4: 432.00*12},
         },
-        "4": {
+        "CLINIC (5 a 8 equipos/consultorios)": {
             "1": {5: 569.00*12, 6: 569.00*12, 7: 569.00*12, 8: 569.00*12},
             "2": {5: 518.40*12, 6: 518.40*12, 7: 518.40*12, 8: 518.40*12},
             "3": {5: 518.40*12, 6: 518.40*12, 7: 518.40*12, 8: 518.40*12},
             "4": {5: 648.00*12, 6: 648.00*12, 7: 648.00*12, 8: 648.00*12},
         },
-        "5": {
+        "CLINIC (9 a 12 equipos/consultorios)": {
             "1": {9: 760.00*12, 10: 760.00*12, 11: 760.00*12, 12: 760.00*12},
             "2": {9: 691.20*12, 10: 691.20*12, 11: 691.20*12, 12: 691.20*12},
             "3": {9: 691.20*12, 10: 691.20*12, 11: 691.20*12, 12: 691.20*12},
@@ -137,15 +137,79 @@ class Gerador:
         self.caminho_saida = Path("contratos_gerados")
         self._criar_diretorios()
 
+    def numero_por_extenso(self, n):
+        #"""Converte número de 1 a 99 para extenso em português."""
+        unidades = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove']
+        especiais = ['dez', 'onze', 'doze', 'treze', 'catorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove']
+        dezenas = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa']
+        if n == 0:
+            return 'zero'
+        if n < 10:
+            return unidades[n]
+        if n < 20:
+            return especiais[n - 10]
+        d = n // 10
+        u = n % 10
+        if u == 0:
+            return dezenas[d]
+        else:
+            return dezenas[d] + ' e ' + unidades[u]
+    
+    def substituir_placeholders(self, doc, plataforma, nome_clinica, razao_social, tipo_licenca, qtd_equipos, tabela_preco, valor_total_venda, valor_entrada, num_parcelas, valor_taxa_implantacao, valor_migracao_inteligente, tipo_migracao):
+    #"""Substitui placeholders no documento DOCX pelos valores fornecidos."""
+    # Determinar valores condicionais
+        nome_clinica_razao = nome_clinica if nome_clinica else razao_social
+        
+        valor_migracao = valor_migracao_inteligente if tipo_migracao == "Inteligente" else 0
+        
+        # Mapeamento de placeholders para valores
+        substituicoes = {
+            '[PLATAFORMA]': plataforma,
+            '[NOMECLINICA]': nome_clinica if nome_clinica else razao_social,
+            '[NOMEOURAZAO]': razao_social if razao_social else "",
+            '[TIPODELICENÇA]': tipo_licenca,
+            '[NEQUIPOS]': str(qtd_equipos),
+            '[TABELAPRECO]': f"R$ {tabela_preco:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+            '[VALORFINAL]': f"R$ {valor_total_venda:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+            '[VALORENTRADA]': f"R$ {valor_entrada:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+            '[PARCELAS]': str(num_parcelas),
+            '[PARCELASEXTENSO]': self.numero_por_extenso(int(num_parcelas)),
+            '[TAXAIMPLANTACAO]': f"R$ {valor_taxa_implantacao:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+            '[VALORMIGRACAO]': f"R$ {valor_migracao:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        }
+        
+        # Percorrer todos os parágrafos do documento
+        for paragrafo in doc.paragraphs:
+            # Juntar todo o texto do parágrafo
+            texto_completo = ''.join([run.text for run in paragrafo.runs])
+            
+            # Verificar se algum placeholder está no parágrafo
+            for placeholder, valor in substituicoes.items():
+                if placeholder in texto_completo:
+                    # Limpar todos os runs do parágrafo
+                    for run in paragrafo.runs:
+                        run.text = ""
+                    
+                    # Substituir no texto completo
+                    texto_completo = texto_completo.replace(placeholder, valor)
+                    
+                    # Adicionar o texto substituído no primeiro run
+                    if paragrafo.runs:
+                        paragrafo.runs[0].text = texto_completo
+                    else:
+                        paragrafo.add_run(texto_completo)
+                    
+                    break  # Sair do loop de placeholders para este parágrafo
+        
+        return doc
+
     def _criar_diretorios(self):
         self.caminho_templates.mkdir(exist_ok=True)
         self.caminho_saida.mkdir(exist_ok=True)
 
     def _mapear_template(self, tipo_licenca):
         candidatos = [
-            self.caminho_templates / f"template_licenca_{tipo_licenca.lower()}.docx",
-            self.caminho_templates / "template_licenca_básica.docx",
-            self.caminho_templates / " template_licenca_equipos_pj.docx",
+            self.caminho_templates / "ContratoAplicativoNetTemplate.docx",
         ]
 
         for caminho in candidatos:
@@ -387,11 +451,29 @@ class Gerador:
         num_parcelas=None, 
         plataforma=None,
         valor_migracao_inteligente=None,
+        valor_taxa_implantacao=None,
+        nome_clinica=None,
     ):
         cpf_limpo = ValidadorDados.validar_cpf(cpf)
         cpf_formatado = ValidadorDados.formatar_cpf(cpf_limpo)
         caminho_template = self._mapear_template(self.TIPOS_LICENCA[tipo_licenca])
         doc = Document(caminho_template)
+
+        doc = self.substituir_placeholders(
+        doc,
+        plataforma=plataforma,
+        nome_clinica=nome,
+        razao_social=None,
+        tipo_licenca=tipo_licenca,
+        qtd_equipos=qtd_equipos,
+        tabela_preco=valor_mensal,
+        valor_total_venda=valor_final,
+        valor_entrada=valor_entrada,
+        num_parcelas=num_parcelas,
+        valor_taxa_implantacao=valor_taxa_implantacao,
+        valor_migracao_inteligente=valor_migracao_inteligente,
+        tipo_migracao=tipo_migracao
+    )
 
         self.aplicar_clausulas_condicionais(
             doc,
@@ -404,7 +486,8 @@ class Gerador:
         )
 
         substituicoes = {
-            '{PLATAFORMA}': plataforma if plataforma else "ControleODONTO", 
+            '{PLATAFORMA}': plataforma if plataforma else "ControleODONTO",
+            '{NOMECLINICA}': nome_clinica if nome_clinica else "",
             "{NOME_CLIENTE}": nome,
             "{RAZAO_SOCIAL}": nome,
             "{CPF}": cpf_formatado,
@@ -444,11 +527,27 @@ class Gerador:
         num_parcelas=None,
         plataforma=None,
         valor_migracao_inteligente=None,
+        valor_taxa_implantacao=None,
     ):
         cnpj_limpo = ValidadorDados.validar_cnpj(cnpj)
         cnpj_formatado = ValidadorDados.formatar_cnpj(cnpj_limpo)
         caminho_template = self._mapear_template(self.TIPOS_LICENCA[tipo_licenca])
         doc = Document(caminho_template)
+        doc = self.substituir_placeholders(
+        doc,
+        plataforma=plataforma,
+        nome_clinica=None,
+        razao_social=razao_social,
+        tipo_licenca=tipo_licenca,
+        qtd_equipos=qtd_equipos,
+        tabela_preco=valor_mensal,
+        valor_total_venda=valor_final,
+        valor_entrada=valor_entrada,
+        num_parcelas=num_parcelas,
+        valor_taxa_implantacao=valor_taxa_implantacao,
+        valor_migracao_inteligente=valor_migracao_inteligente,
+        tipo_migracao=tipo_migracao
+    )
 
         self.aplicar_clausulas_condicionais(
             doc,
