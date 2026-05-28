@@ -460,10 +460,11 @@ with col_form:
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Valor Total da Venda", f"R$ {valor_total_venda:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            st.metric("Valor Migração", f"R$ {valor_migracao_inteligente_pf:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
         with col2:
             st.metric("Taxa de Implantação", f"R$ {taxa_impl_pf:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        with col3:
-            st.metric(f"Valor com Desconto ({desconto_pf})", f"R$ {valor_com_desconto_pf:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            st.metric(f"Valor da Licença ({desconto_pf})", f"R$ {valor_com_desconto_pf:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
         st.markdown("---")
         st.subheader("Detalhamento do Pagamento")
@@ -626,7 +627,7 @@ with col_form:
         with col2:
             st.metric("Taxa de Implantação", f"R$ {taxa_impl:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         with col3:
-            st.metric(f"Valor com Desconto ({desconto_pj})", f"R$ {valor_com_desconto_pj:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            st.metric(f"Valor da licença ({desconto_pj})", f"R$ {valor_com_desconto_pj:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
         st.markdown("---")
 
