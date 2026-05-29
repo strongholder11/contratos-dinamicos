@@ -495,7 +495,7 @@ with col_form:
                         caminho = gerador.gerar_contrato_pf(
                             nome,
                             cpf,
-                            tipo_licenca_pf_key,
+                            tipo_licenca_pf,
                             tipo_implantacao=tipo_implantacao_pf,
                             qtd_equipos=qtd_equipos_pf,
                             tipo_migracao=tipo_migracao_pf,
@@ -537,7 +537,7 @@ with col_form:
     )
         razao_social = st.text_input("Razão Social", placeholder="Ex: Empresa LTDA", key="pj_razao_social")
         cnpj = st.text_input("CNPJ", placeholder="12.345.678/0001-90 ou 12345678000190", key="pj_cnpj")
-        
+
         tipo_licenca_pj = st.selectbox("Tipo de Licença", options=list(gerador.TIPOS_LICENCA.values()), key="pj_licenca")
 
         tipo_implantacao_pj = None
@@ -645,7 +645,7 @@ with col_form:
                         caminho = gerador.gerar_contrato_pj(
                             razao_social,
                             cnpj,
-                            tipo_licenca_pj_key,
+                            tipo_licenca_pj,
                             tipo_implantacao=tipo_implantacao_pj,
                             qtd_equipos=qtd_equipos_pj,
                             tipo_migracao=tipo_migracao_pj,

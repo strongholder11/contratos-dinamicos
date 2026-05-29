@@ -155,18 +155,16 @@ class Gerador:
         else:
             return dezenas[d] + ' e ' + unidades[u]
     
-    def substituir_placeholders(self, doc, plataforma, nome_clinica, razao_social, tipo_licenca, qtd_equipos, tabela_preco, valor_total_venda, valor_entrada, num_parcelas, valor_taxa_implantacao, valor_migracao_inteligente, tipo_migracao):
-    #"""Substitui placeholders no documento DOCX pelos valores fornecidos."""
-    # Determinar valores condicionais
+    def substituir_placeholders(self, doc, plataforma, nome_clinica, razao_social, tipo_licenca, qtd_equipos, tabela_preco, valor_total_venda, valor_entrada, num_parcelas, valor_taxa_implantacao, valor_migracao_inteligente, tipo_migracao, cpf_cnpj):
+        """Substitui placeholders no documento DOCX pelos valores fornecidos."""
         nome_clinica_razao = nome_clinica if nome_clinica else razao_social
-        
         valor_migracao = valor_migracao_inteligente if tipo_migracao == "Inteligente" else 0
         
-        # Mapeamento de placeholders para valores
         substituicoes = {
             '[PLATAFORMA]': plataforma,
-            '[NOMECLINICA]': nome_clinica if nome_clinica else razao_social,
-            '[NOMEOURAZAO]': razao_social if razao_social else "",
+            '[NOMECLINICA]': nome_clinica_razao,
+            '[NOMEOURAZAO]': nome_clinica_razao,
+            '[CPF/CNPJ]': cpf_cnpj,
             '[TIPODELICENÇA]': tipo_licenca,
             '[NEQUIPOS]': str(qtd_equipos),
             '[TABELAPRECO]': f"R$ {tabela_preco:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
@@ -178,28 +176,45 @@ class Gerador:
             '[VALORMIGRACAO]': f"R$ {valor_migracao:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         }
         
-        # Percorrer todos os parágrafos do documento
+        # Substituir em parágrafos
         for paragrafo in doc.paragraphs:
-            # Juntar todo o texto do parágrafo
+            # Juntar texto completo do parágrafo
             texto_completo = ''.join([run.text for run in paragrafo.runs])
             
-            # Verificar se algum placeholder está no parágrafo
+            # Verificar se há algum placeholder
             for placeholder, valor in substituicoes.items():
                 if placeholder in texto_completo:
-                    # Limpar todos os runs do parágrafo
+                    # Limpar todos os runs
                     for run in paragrafo.runs:
                         run.text = ""
                     
                     # Substituir no texto completo
                     texto_completo = texto_completo.replace(placeholder, valor)
                     
-                    # Adicionar o texto substituído no primeiro run
+                    # Adicionar texto no primeiro run
                     if paragrafo.runs:
                         paragrafo.runs[0].text = texto_completo
                     else:
                         paragrafo.add_run(texto_completo)
-                    
-                    break  # Sair do loop de placeholders para este parágrafo
+        
+        # Substituir em tabelas
+        for tabela in doc.tables:
+            for linha in tabela.rows:
+                for celula in linha.cells:
+                    for paragrafo in celula.paragraphs:
+                        texto_completo = ''.join([run.text for run in paragrafo.runs])
+                        
+                        for placeholder, valor in substituicoes.items():
+                            if placeholder in texto_completo:
+                                for run in paragrafo.runs:
+                                    run.text = ""
+                                
+                                texto_completo = texto_completo.replace(placeholder, valor)
+                                
+                                if paragrafo.runs:
+                                    paragrafo.runs[0].text = texto_completo
+                                else:
+                                    paragrafo.add_run(texto_completo)
         
         return doc
 
@@ -472,7 +487,8 @@ class Gerador:
         num_parcelas=num_parcelas,
         valor_taxa_implantacao=valor_taxa_implantacao,
         valor_migracao_inteligente=valor_migracao_inteligente,
-        tipo_migracao=tipo_migracao
+        tipo_migracao=tipo_migracao,
+        cpf_cnpj=cpf
     )
 
         self.aplicar_clausulas_condicionais(
@@ -492,7 +508,7 @@ class Gerador:
             "{RAZAO_SOCIAL}": nome,
             "{CPF}": cpf_formatado,
             "{CNPJ}": cpf_formatado,
-            "{TIPO_LICENCA}": self.TIPOS_LICENCA[tipo_licenca],
+            "{TIPODELICENCA}": self.TIPOS_LICENCA[tipo_licenca],
             "{TIPO_IMPLANTACAO}": tipo_implantacao,
             "{QTD_EQUIPOS}": qtd_equipos,
             "{TIPO_MIGRACAO}": tipo_migracao,
@@ -546,7 +562,8 @@ class Gerador:
         num_parcelas=num_parcelas,
         valor_taxa_implantacao=valor_taxa_implantacao,
         valor_migracao_inteligente=valor_migracao_inteligente,
-        tipo_migracao=tipo_migracao
+        tipo_migracao=tipo_migracao,
+        cpf_cnpj=cnpj
     )
 
         self.aplicar_clausulas_condicionais(
@@ -564,7 +581,7 @@ class Gerador:
             "{NOME_CLIENTE}": razao_social,
             "{RAZAO_SOCIAL}": razao_social,
             "{CNPJ}": cnpj_formatado,
-            "{TIPO_LICENCA}": self.TIPOS_LICENCA[tipo_licenca],
+            "{TIPODELICENCA}": self.TIPOS_LICENCA[tipo_licenca],
             "{TIPO_IMPLANTACAO}": tipo_implantacao,
             "{QTD_EQUIPOS}": qtd_equipos,
             "{TIPO_MIGRACAO}": tipo_migracao,
